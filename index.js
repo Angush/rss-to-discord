@@ -39,8 +39,7 @@ const postToWebhook = ({ creator, title, url, content, timestamp, fullTitle, ima
       delete embed.description
     }
   }
-  console.log(`\n===== POSTING EMBED ${imageCount} =====`)
-  console.log(JSON.stringify({ ...options, embeds: [embed] }, null, 4))
+  // console.log(JSON.stringify({ ...options, embeds: [embed] }, null, 4))
 
   fetch(process.env.WEBHOOK, {
     method: 'POST',
@@ -51,9 +50,11 @@ const postToWebhook = ({ creator, title, url, content, timestamp, fullTitle, ima
   })
   .then(res => {
     lastpost = timestamp
-    fs.writeFile('lastpost', lastpost, () => {})
-    if (res.ok) console.log(`[${res.status}] Posted "${title}" successfully!`)
-    else console.log(`[${res.status}] Could not post "${title}": ${res.statusText}`)
+    if (imageCount === 0) fs.writeFile('lastpost', lastpost, () => {})
+    let resText = `[${res.status}]`
+    let imageCountText = imageCount > 0 ? ` (image #${imageCount + 1})` : ``
+    if (res.ok) console.log(`${resText} Posted "${title}"${imageCountText} successfully!`)
+    else console.log(`${resText} Could not post "${title}"${imageCountText}: ${res.statusText}`)
     if (images.length > 0) postToWebhook({ creator, title, url, content, timestamp, fullTitle, images, imageCount: imageCount + 1 })
   })
 }
@@ -89,7 +90,7 @@ const checkFeed = () => {
     const $ = cheerio.load(raw.replace(/<(em|i)>\s*|\s*<\/(em|i)>/g, '*'))
     $('a').each((index, element) => {
       let elem = $(element)
-      console.log(`Testing a ${index} - ${elem.attr('href')} - ${elem.text()}`)
+      // console.log(`Testing a ${index} - ${elem.attr('href')} - ${elem.text()}`)
       if (elem.text().match(/(Next|Prev(ious)?)\s+Chapter/)) return
       elem.text(
         `**[${elem.text().replace(/^[\[\]\(\)]*|[\[\]\(\)]*$/, '').trim()}]` +
@@ -112,7 +113,7 @@ const checkFeed = () => {
       else return image.attr('src')
     })
     let images = Array.from(imageElements)
-    console.log(images)
+    // console.log(images)
     
     postToWebhook({ creator, title, url, content, timestamp, fullTitle, images })
   })
