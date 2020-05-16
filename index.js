@@ -13,7 +13,7 @@ if (!process.env.FEED || !process.env.WEBHOOK) {
 if (!process.env.INTERVAL) console.log(`No interval set. Defaulting to 1 minute.`)
 let lastpost = fs.readFileSync('lastpost', 'utf8') || new Date().toISOString()
 
-const postToWebhook = ({ creator, title, url, content, timestamp, fullTitle, image }) => {
+const postToWebhook = ({ creator, title, url, content, timestamp, fullTitle, images = [], imageCount = 0 }) => {
   let embed = {
     url,
     timestamp,
@@ -23,6 +23,7 @@ const postToWebhook = ({ creator, title, url, content, timestamp, fullTitle, ima
       text: process.env.FOOTER_TEXT || creator
     },
   }
+
   
   let options = {}
   if (process.env.USERNAME) options.username = process.env.USERNAME
@@ -30,9 +31,16 @@ const postToWebhook = ({ creator, title, url, content, timestamp, fullTitle, ima
   if (process.env.CONTENT) options.content = process.env.CONTENT
   if (process.env.FOOTER_ICON) embed.footer.icon_url = process.env.FOOTER_ICON
   if (process.env.COLOR) embed.color = process.env.COLOR
-  if (image) embed.image = { url: image }
-  
-  // console.log(JSON.stringify({ ...options, embeds: [embed] }, null, 4))
+  if (images.length > 0) {
+    let image = images.shift()
+    embed.image = { url: image }
+    if (imageCount !== 0) {
+      options.content = `Image \`#${imageCount + 1}\`.`
+      delete embed.description
+    }
+  }
+  console.log(`\n===== POSTING EMBED ${imageCount} =====`)
+  console.log(JSON.stringify({ ...options, embeds: [embed] }, null, 4))
 
   fetch(process.env.WEBHOOK, {
     method: 'POST',
@@ -46,6 +54,7 @@ const postToWebhook = ({ creator, title, url, content, timestamp, fullTitle, ima
     fs.writeFile('lastpost', lastpost, () => {})
     if (res.ok) console.log(`[${res.status}] Posted "${title}" successfully!`)
     else console.log(`[${res.status}] Could not post "${title}": ${res.statusText}`)
+    if (images.length > 0) postToWebhook({ creator, title, url, content, timestamp, fullTitle, images, imageCount: imageCount + 1 })
   })
 }
 
@@ -56,7 +65,7 @@ const getNextItem = items => {
     let date = new Date(items[i].isoDate).toISOString()
     if (date > lastpost) {
       item = items[i]
-      console.log(`Attempting to post "${item.title}" ...`)
+      console.log(`Attempting to post "${item.title}" (${new Date(item.isoDate).toISOString()}) ...`)
       break
     }
   }
@@ -78,6 +87,7 @@ const checkFeed = () => {
         : `${process.env.PREPEND} ${title}`)
     
     const $ = cheerio.load(raw.replace(/<(em|i)>\s*|\s*<\/(em|i)>/g, '*'))
+
     let content = $.text()
     if (process.env.TRIM_REGEX) content = content.replace(new RegExp(process.env.TRIM_REGEX, 's'), '').trim()
     content = content.substr(0, 800 - url.length).trim().split(' ')
@@ -87,11 +97,15 @@ const checkFeed = () => {
     let asterisks = content.match(/\*/g) || []
     if (asterisks.length % 2 !== 0) content = `${content.trim()}*`
     
-    let image = $('img').first()
-    if (image.attr('srcset')) image = image.attr('srcset').replace(/\s+(\d+[\w,]+)/g, '').split(/\s+/).pop()
-    else image = image.attr('src')
+    let imageElements = $('img').map((index, element) => {
+      let image = $(element)
+      if (image.attr('srcset')) return image.attr('srcset').replace(/\s+(\d+[\w,]+)/g, '').split(/\s+/).pop()
+      else return image.attr('src')
+    })
+    let images = Array.from(imageElements)
+    console.log(images)
     
-    postToWebhook({ creator, title, url, content, timestamp, fullTitle, image })
+    postToWebhook({ creator, title, url, content, timestamp, fullTitle, images })
   })
 }
 
