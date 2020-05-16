@@ -87,6 +87,15 @@ const checkFeed = () => {
         : `${process.env.PREPEND} ${title}`)
     
     const $ = cheerio.load(raw.replace(/<(em|i)>\s*|\s*<\/(em|i)>/g, '*'))
+    $('a').each((index, element) => {
+      let elem = $(element)
+      console.log(`Testing a ${index} - ${elem.attr('href')} - ${elem.text()}`)
+      if (elem.text().match(/(Next|Prev(ious)?)\s+Chapter/)) return
+      elem.text(
+        `**[${elem.text().replace(/^[\[\]\(\)]*|[\[\]\(\)]*$/, '').trim()}]` +
+        `(${elem.attr('href')})**`
+      )
+    })
 
     let content = $.text()
     if (process.env.TRIM_REGEX) content = content.replace(new RegExp(process.env.TRIM_REGEX, 's'), '').trim()
